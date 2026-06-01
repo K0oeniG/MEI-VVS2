@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendar</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<nav>
+    <div>
+        <a href="/calendar">Calendar</a>
+        <a href="/meetings/new">Propose a meeting</a>
+        <a href="/discover">Discover</a>
+    </div>
+    <div>
+        <span>Signed in as <strong th:text="${user.username}"></strong></span>
+        <form method="post" th:action="@{/logout}" style="display:inline;margin-left:1rem;">
+            <button type="submit" class="secondary" style="margin:0;padding:0.3rem 0.7rem;">Sign out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="card" th:if="${!pendingInvites.isEmpty()}">
+        <h2>Pending invites</h2>
+        <p class="muted">These slots are tentatively blocked on your calendar until you respond.</p>
+        <div th:each="invite : ${pendingInvites}" class="invite">
+            <strong th:text="${invite.meeting.title}"></strong>
+            <span class="badge tentative">pending</span>
+            <div class="muted">
+                <span th:text="${#temporals.format(invite.meeting.startTime, 'yyyy-MM-dd HH:mm', T(java.time.ZoneId).systemDefault())}"></span>
+                &mdash;
+                <span th:text="${#temporals.format(invite.meeting.endTime, 'yyyy-MM-dd HH:mm', T(java.time.ZoneId).systemDefault())}"></span>
+                · organised by <span th:text="${invite.meeting.organizer.username}"></span>
+            </div>
+            <div th:if="${invite.meeting.description != null and !invite.meeting.description.isBlank()}"
+                 th:text="${invite.meeting.description}" style="margin-top:0.5rem;"></div>
+            <div class="actions" style="margin-top:0.75rem;">
+                <form method="post" th:action="@{|/meetings/${invite.meeting.id}/respond|}">
+                    <input type="hidden" name="action" value="accept">
+                    <button type="submit" style="margin:0;">Accept</button>
+                </form>
+                <form method="post" th:action="@{|/meetings/${invite.meeting.id}/respond|}">
+                    <input type="hidden" name="action" value="decline">
+                    <button type="submit" class="danger" style="margin:0;">Decline</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Your calendar</h2>
+        <p class="muted" th:if="${meetings.isEmpty()}">No meetings yet. <a href="/meetings/new">Propose one</a>.</p>
+        <div th:each="m : ${meetings}"
+             th:classappend="${m.isConfirmed()} ? '' : 'tentative'"
+             class="meeting">
+            <strong th:text="${m.title}"></strong>
+            <span th:if="${m.isConfirmed()}" class="badge confirmed">confirmed</span>
+            <span th:unless="${m.isConfirmed()}" class="badge tentative">tentative</span>
+            <div class="muted">
+                <span th:text="${#temporals.format(m.startTime, 'yyyy-MM-dd HH:mm', T(java.time.ZoneId).systemDefault())}"></span>
+                &mdash;
+                <span th:text="${#temporals.format(m.endTime, 'yyyy-MM-dd HH:mm', T(java.time.ZoneId).systemDefault())}"></span>
+                · organised by <span th:text="${m.organizer.username}"></span>
+            </div>
+            <div th:if="${m.description != null and !m.description.isBlank()}"
+                 th:text="${m.description}" style="margin-top:0.5rem;"></div>
+            <div class="muted" style="margin-top:0.5rem;">
+                Participants:
+                <span th:each="p, it : ${m.participants}">
+                    <span th:text="${p.user.username}"></span>
+                    <span th:text="'(' + ${#strings.toLowerCase(p.status.name())} + ')'"></span><span th:if="${!it.last}">, </span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Subscribe (iCal)</h2>
+        <p class="muted">
+            Subscribe in Apple Calendar, Google Calendar, Outlook, etc. The link contains a
+            personal token — keep it private.
+        </p>
+        <p><strong>webcal (recommended):</strong></p>
+        <code class="url" th:text="${icalWebcalUrl}"></code>
+        <p><strong>https URL:</strong></p>
+        <code class="url" th:text="${icalHttpUrl}"></code>
+        <a th:href="${icalHttpUrl}" class="btn secondary">Download .ics</a>
+    </div>
+
+</div>
+</body>
+</html>

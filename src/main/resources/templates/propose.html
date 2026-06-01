@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Propose a meeting</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<nav>
+    <div>
+        <a href="/calendar">Calendar</a>
+        <a href="/meetings/new">Propose a meeting</a>
+        <a href="/discover">Discover</a>
+    </div>
+    <div>
+        <form method="post" th:action="@{/logout}" style="display:inline;">
+            <button type="submit" class="secondary" style="margin:0;padding:0.3rem 0.7rem;">Sign out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <h1>Propose a meeting</h1>
+        <p class="muted">
+            This slot is blocked on your calendar as soon as you propose it. Invitees see it as a
+            pending invite; once everyone accepts, the meeting is marked confirmed.
+        </p>
+        <div th:if="${error}" class="error" th:text="${error}"></div>
+        <form method="post" th:action="@{/meetings/new}">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" th:value="${title}" required>
+
+            <label for="description">Description (optional)</label>
+            <textarea id="description" name="description" th:text="${description}"></textarea>
+
+            <label for="start">Start</label>
+            <input type="datetime-local" id="start" name="start" th:value="${start}" required>
+
+            <label for="end">End</label>
+            <input type="datetime-local" id="end" name="end" th:value="${end}" required>
+
+            <label for="invitees">Invitees (comma- or space-separated usernames)</label>
+            <input type="text" id="invitees" name="invitees" th:value="${invitees}" placeholder="alice, bob">
+
+            <button type="submit">Propose</button>
+            <a href="/calendar" class="btn secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+</body>
+</html>

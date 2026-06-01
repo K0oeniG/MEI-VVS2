@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Discover events</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<nav>
+    <div>
+        <a href="/calendar">Calendar</a>
+        <a href="/meetings/new">Propose a meeting</a>
+        <a href="/discover">Discover</a>
+    </div>
+    <div>
+        <form method="post" th:action="@{/logout}" style="display:inline;">
+            <button type="submit" class="secondary" style="margin:0;padding:0.3rem 0.7rem;">Sign out</button>
+        </form>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <h1>Discover events</h1>
+        <p class="muted">
+            Search public ticketing sites by keyword and copy events straight to your calendar.
+        </p>
+
+        <div th:if="${!anyConfigured}" class="error">
+            No discovery providers are configured. Set <code>app.discover.ticketmaster.api-key</code>
+            and/or <code>app.discover.seatgeek.client-id</code> in
+            <code>application.properties</code> (or as environment variables) and restart.
+        </div>
+
+        <form method="get" action="/discover" style="display:flex;gap:0.5rem;align-items:flex-end;">
+            <div style="flex:1;">
+                <label for="q">Keywords</label>
+                <input type="text" id="q" name="q" th:value="${q}" placeholder="e.g. jazz, lakers, taylor swift" autofocus>
+            </div>
+            <button type="submit" style="margin:0;">Search</button>
+        </form>
+
+        <div class="muted" style="margin-top:0.75rem;">
+            Providers:
+            <span th:each="p, it : ${providers}">
+                <span th:text="${p.name()}"></span>
+                <span th:if="${p.configured}" class="badge confirmed">configured</span>
+                <span th:unless="${p.configured}" class="badge tentative">unconfigured</span><span th:if="${!it.last}">, </span>
+            </span>
+        </div>
+    </div>
+
+    <div class="card" th:if="${q != null and !q.isBlank() and anyConfigured}">
+        <h2>Results for &ldquo;<span th:text="${q}"></span>&rdquo;</h2>
+        <p class="muted" th:if="${results.isEmpty()}">No events found. Try a broader keyword.</p>
+
+        <div th:each="e : ${results}" class="meeting">
+            <strong th:text="${e.title()}"></strong>
+            <span class="badge" th:text="${e.source()}"></span>
+            <div class="muted">
+                <span th:text="${#temporals.format(e.start(), 'yyyy-MM-dd HH:mm', T(java.time.ZoneId).systemDefault())}"></span>
+                <span th:if="${e.venue() != null}"> · <span th:text="${e.venue()}"></span></span>
+            </div>
+            <div th:if="${e.description() != null and !e.description().isBlank()}"
+                 th:text="${e.description()}" style="margin-top:0.5rem;"></div>
+            <div class="actions" style="margin-top:0.75rem;">
+                <a th:href="${e.url()}" target="_blank" rel="noopener" class="btn secondary" th:if="${e.url() != null}">View on site</a>
+                <form method="post" th:action="@{/discover/copy}" style="display:inline;">
+                    <input type="hidden" name="source"     th:value="${e.source()}">
+                    <input type="hidden" name="externalId" th:value="${e.externalId()}">
+                    <input type="hidden" name="title"      th:value="${e.title()}">
+                    <input type="hidden" name="description" th:value="${e.description()}">
+                    <input type="hidden" name="start"      th:value="${e.start()}">
+                    <input type="hidden" name="end"        th:value="${e.end()}">
+                    <input type="hidden" name="url"        th:value="${e.url()}">
+                    <input type="hidden" name="venue"      th:value="${e.venue()}">
+                    <button type="submit" style="margin:0;">Copy to my calendar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
