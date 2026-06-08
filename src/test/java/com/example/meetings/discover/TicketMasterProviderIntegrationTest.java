@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import com.github.tomakehurst.wiremock.WireMockServer;
+
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -13,7 +15,13 @@ import java.util.List;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.discover.ticketmaster.base-url=http://localhost:8089/mock-ticketmaster",
+        "app.discover.ticketmaster.api-key=mock-api-key-for-ci",
+        "app.discover.ticketmaster.country-code=PT",
+        "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1"
+})
+@ActiveProfiles("test")
 @DisplayName("Ticketmaster Provider Live Integration Mapping Test")
 class TicketmasterProviderIntegrationTest {
 
