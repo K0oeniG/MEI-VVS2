@@ -25,18 +25,29 @@ public class SeatGeekProvider implements EventProvider {
     private final String clientId;
     private final RestClient http;
 
-    public SeatGeekProvider(@Value("${app.discover.seatgeek.client-id:}") String clientId) {
+    public SeatGeekProvider(
+            @Value("${app.discover.seatgeek.base-url:https://api.seatgeek.com/2}") String baseUrl,
+            @Value("${app.discover.seatgeek.client-id:}") String clientId) {
         this.clientId = clientId;
-        this.http = RestClient.builder().baseUrl("https://api.seatgeek.com/2").build();
+        this.http = RestClient.builder()
+                .baseUrl(baseUrl)
+                .build();
     }
 
-    @Override public String name() { return "SeatGeek"; }
+    @Override
+    public String name() {
+        return "SeatGeek";
+    }
 
-    @Override public boolean isConfigured() { return clientId != null && !clientId.isBlank(); }
+    @Override
+    public boolean isConfigured() {
+        return clientId != null && !clientId.isBlank();
+    }
 
     @Override
     public List<DiscoveredEvent> search(String query) {
-        if (!isConfigured()) return List.of();
+        if (!isConfigured())
+            return List.of();
         String path = UriComponentsBuilder.fromPath("/events")
                 .queryParam("q", query)
                 .queryParam("per_page", 20)
@@ -46,14 +57,16 @@ public class SeatGeekProvider implements EventProvider {
             Response body = http.get()
                     .uri(path)
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (req, res) ->
-                            log.warn("SeatGeek search failed: {}", res.getStatusCode()))
+                    .onStatus(HttpStatusCode::isError,
+                            (req, res) -> log.warn("SeatGeek search failed: {}", res.getStatusCode()))
                     .body(Response.class);
-            if (body == null || body.events == null) return List.of();
+            if (body == null || body.events == null)
+                return List.of();
             List<DiscoveredEvent> results = new ArrayList<>();
             for (SgEvent e : body.events) {
                 Instant start = parseStart(e);
-                if (start == null) continue;
+                if (start == null)
+                    continue;
                 String venue = e.venue != null ? e.venue.name : null;
                 String title = e.title != null ? e.title : e.shortTitle;
                 results.add(new DiscoveredEvent(
@@ -67,8 +80,10 @@ public class SeatGeekProvider implements EventProvider {
     }
 
     private static Instant parseStart(SgEvent e) {
-        // SeatGeek returns datetime_utc as ISO-8601 without a zone designator; treat as UTC.
-        if (e.datetimeUtc == null) return null;
+        // SeatGeek returns datetime_utc as ISO-8601 without a zone designator; treat as
+        // UTC.
+        if (e.datetimeUtc == null)
+            return null;
         try {
             return LocalDateTime.parse(e.datetimeUtc).toInstant(ZoneOffset.UTC);
         } catch (Exception ignored) {
@@ -77,17 +92,25 @@ public class SeatGeekProvider implements EventProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Response { public List<SgEvent> events; }
+    static class Response {
+        public List<SgEvent> events;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SgEvent {
         public long id;
         public String title;
-        @JsonProperty("short_title") public String shortTitle;
-        @JsonProperty("datetime_utc") public String datetimeUtc;
+        @JsonProperty("short_title")
+        public String shortTitle;
+        @JsonProperty("datetime_utc")
+        public String datetimeUtc;
         public String url;
         public String description;
         public SgVenue venue;
     }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class SgVenue { public String name; }
+    static class SgVenue {
+        public String name;
+    }
 }

@@ -24,24 +24,34 @@ public class TicketmasterProvider implements EventProvider {
     private final RestClient http;
 
     public TicketmasterProvider(
+            @Value("${app.discover.ticketmaster.base-url:https://app.ticketmaster.com/discovery/v2}") String baseUrl,
             @Value("${app.discover.ticketmaster.api-key:}") String apiKey,
             @Value("${app.discover.ticketmaster.country-code:PT}") String countryCode) {
         this.apiKey = apiKey;
         this.countryCode = countryCode;
         this.http = RestClient.builder()
-                .baseUrl("https://app.ticketmaster.com/discovery/v2")
+                .baseUrl(baseUrl)
                 .build();
     }
 
-    @Override public String name() { return "Ticketmaster"; }
+    @Override
+    public String name() {
+        return "Ticketmaster";
+    }
 
-    @Override public boolean isConfigured() { return apiKey != null && !apiKey.isBlank(); }
+    @Override
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank();
+    }
 
     @Override
     public List<DiscoveredEvent> search(String query) {
-        if (!isConfigured()) return List.of();
-        // toUriString() returns a relative path; RestClient resolves it against baseUrl.
-        // Passing URI directly bypasses baseUrl resolution and breaks with "undefined scheme".
+        if (!isConfigured())
+            return List.of();
+        // toUriString() returns a relative path; RestClient resolves it against
+        // baseUrl.
+        // Passing URI directly bypasses baseUrl resolution and breaks with "undefined
+        // scheme".
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/events.json")
                 .queryParam("keyword", query)
                 .queryParam("size", 20)
@@ -64,7 +74,8 @@ public class TicketmasterProvider implements EventProvider {
             List<DiscoveredEvent> results = new ArrayList<>();
             for (TmEvent e : body.embedded.events) {
                 Instant start = parseStart(e);
-                if (start == null) continue; // skip TBA events; they can't be calendared meaningfully
+                if (start == null)
+                    continue; // skip TBA events; they can't be calendared meaningfully
                 String venue = (e.embedded != null && e.embedded.venues != null && !e.embedded.venues.isEmpty())
                         ? e.embedded.venues.get(0).name
                         : null;
@@ -79,20 +90,29 @@ public class TicketmasterProvider implements EventProvider {
     }
 
     private static Instant parseStart(TmEvent e) {
-        if (e.dates == null || e.dates.start == null) return null;
+        if (e.dates == null || e.dates.start == null)
+            return null;
         if (e.dates.start.dateTime != null) {
-            try { return Instant.parse(e.dates.start.dateTime); }
-            catch (Exception ignored) { return null; }
+            try {
+                return Instant.parse(e.dates.start.dateTime);
+            } catch (Exception ignored) {
+                return null;
+            }
         }
         return null;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Response {
-        @com.fasterxml.jackson.annotation.JsonProperty("_embedded") public Embedded embedded;
+        @com.fasterxml.jackson.annotation.JsonProperty("_embedded")
+        public Embedded embedded;
     }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Embedded { public List<TmEvent> events; }
+    static class Embedded {
+        public List<TmEvent> events;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class TmEvent {
         public String id;
@@ -101,14 +121,27 @@ public class TicketmasterProvider implements EventProvider {
         public String info;
         public Dates dates;
         // Ticketmaster nests venues under another _embedded inside each event.
-        @com.fasterxml.jackson.annotation.JsonProperty("_embedded") public EventEmbedded embedded;
+        @com.fasterxml.jackson.annotation.JsonProperty("_embedded")
+        public EventEmbedded embedded;
     }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class EventEmbedded { public List<Venue> venues; }
+    static class EventEmbedded {
+        public List<Venue> venues;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Venue { public String name; }
+    static class Venue {
+        public String name;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Dates { public Start start; }
+    static class Dates {
+        public Start start;
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Start { public String dateTime; }
+    static class Start {
+        public String dateTime;
+    }
 }
