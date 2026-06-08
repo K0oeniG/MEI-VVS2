@@ -12,6 +12,9 @@ jobs:
     name: Build Application & Execute Test Suites
     runs-on: ubuntu-latest
 
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
     steps:
       # Step 1: Extract the source code hierarchy from the target git branch
       - name: Checkout Code Repository
