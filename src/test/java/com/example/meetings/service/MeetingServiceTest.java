@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -73,7 +74,6 @@ class MeetingServiceTest {
     @BeforeEach
     void setupBaseEntities() {
         organizer = new User("org_user", "org@example.com", "hash");
-        // TODO: MAKE SURE TO INCLUDE THE REFLECTION IN THE REPORT
         ReflectionTestUtils.setField(organizer, "id", 1L);
         now = Instant.now();
     }
@@ -174,6 +174,38 @@ class MeetingServiceTest {
             // Assert 2: Prevent corrupted models from being persisted
             verify(meetingRepository, never()).save(any());
         }
+
+        /**
+         * Test Case propose -> Null or Empty Invitee Usernames Branch Path
+         * Objectives: Verify that null, empty, or whitespace-only elements inside the
+         * invitee array list are safely bypassed without invoking repository
+         * structures.
+         * Specific Verifications:
+         * - Ensures null elements evaluate to empty strings within the normalization
+         * guard
+         * - Ensures blank elements trigger the loop continue guard expression
+         */
+        @Test
+        @DisplayName("Should skip null, empty, or blank usernames in the invitee list")
+        void propose_NullOrEmptyUsernames_AreSkipped() {
+            // Setup the Input and mock expectations
+            String title = "Coverage Sync";
+            Instant end = now.plus(45, ChronoUnit.MINUTES);
+
+            when(meetingRepository.save(any(Meeting.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // Execute a unit of work containing conditional string edge elements
+            Meeting result = meetingService.propose(
+                    organizer, title, "Testing Guards", now, end,
+                    Arrays.asList("", "   ", null));
+
+            // Assert 1: Collection must isolate the structural organizer without additions
+            assertNotNull(result);
+            assertEquals(1, result.getParticipants().size());
+
+            // Assert 2: Check that the system did not probe database repository layers
+            verifyNoInteractions(userRepository);
+        }
     }
 
     /**
@@ -234,6 +266,28 @@ class MeetingServiceTest {
             assertThrows(IllegalArgumentException.class,
                     () -> meetingService.respond(1L, organizer, InviteStatus.ACCEPTED));
         }
+
+        /**
+         * Test Case respond -> Successful Declined Path
+         * Objectives: Verify that mutating a participant invite state to DECLINED
+         * transitions successfully through allowed conditional guards.
+         */
+        @Test
+        @DisplayName("Should successfully update invite status when DECLINED response status is provided")
+        void respond_DeclinedStatus_Success() {
+            // Setup the Input mapping an active invitation
+            Long meetingId = 200L;
+            MeetingParticipant participant = new MeetingParticipant(null, organizer, InviteStatus.PENDING);
+
+            when(participantRepository.findByMeetingIdAndUserId(meetingId, organizer.getId()))
+                    .thenReturn(Optional.of(participant));
+
+            // Execute a unit of work
+            meetingService.respond(meetingId, organizer, InviteStatus.DECLINED);
+
+            // Assert 1: Confirm state mutation matches chosen input parameter
+            assertEquals(InviteStatus.DECLINED, participant.getStatus());
+        }
     }
 
     /**
@@ -293,6 +347,52 @@ class MeetingServiceTest {
             // condition
             assertEquals(InviteStatus.ACCEPTED, selfParticipant.getStatus());
         }
+
+        /**
+         * Test Case copyFromDiscovered -> Explicit End Time and Optional Fields
+         * Omission Path
+         * Objectives: Verify that explicit end times are honored, and description
+         * components
+         * cleanly omit metadata segments when processing missing, blank, or null
+         * parameters.
+         * Specific Verifications:
+         * - Ensures the explicit end time boundary is mapped instead of triggering the
+         * 2-hour window fallback
+         * - Ensures null descriptions, blank venues, and missing URLs do not append
+         * junk records to text blocks
+         */
+        @Test
+        @DisplayName("Should use explicit end time and omit missing optional parameters from description string")
+        void copyFromDiscovered_WithEndTimeAndNullFields_MapsCorrectly() {
+            // Setup input delivering explicit end time alongside null and blank metadata
+            // parameters
+            Instant explicitEnd = now.plus(4, ChronoUnit.HOURS);
+            DiscoveredEvent structuralEvent = new DiscoveredEvent(
+                    "ManualImporter",
+                    "ext-555",
+                    "Briefing Room",
+                    null, // Triggers description null branch
+                    now,
+                    explicitEnd, // Triggers explicit end time true branch
+                    null, // Triggers URL null branch
+                    "   " // Triggers venue isBlank branch
+            );
+
+            when(meetingRepository.save(any(Meeting.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // Execute a unit of work
+            Meeting savedMeeting = meetingService.copyFromDiscovered(organizer, structuralEvent);
+
+            // Assert 1: Check that duration bounds strictly match configured parameters
+            assertNotNull(savedMeeting);
+            assertEquals(explicitEnd, savedMeeting.getEndTime());
+
+            // Assert 2: Trace description parameters ensuring blank structures are skipped
+            String desc = savedMeeting.getDescription();
+            assertFalse(desc.contains("Venue:"));
+            assertTrue(desc.startsWith("Source: ManualImporter"));
+            assertFalse(desc.contains("(")); // Missing URL parens verification
+        }
     }
 
     /**
@@ -341,6 +441,52 @@ class MeetingServiceTest {
 
             // Assert 1: Verify execution throws the expected exception
             assertThrows(IllegalArgumentException.class, () -> meetingService.calendarForIcalToken("bad"));
+        }
+    }
+
+    /**
+     * Test Group: Calendar and Invite Query Pipelines
+     * Objectives: Validate straight-line lookup pass-through implementations
+     * targeting
+     * underlying domain storage interfaces.
+     */
+    @Nested
+    @DisplayName("Tests for Calendar and Invite Queries")
+    class QueryTests {
+
+        /**
+         * Test Case calendarFor -> Lookup Verification Path
+         */
+        @Test
+        @DisplayName("Should delegate user calendar queries straight to repository components")
+        void calendarFor_DelegatesToRepository() {
+            // Setup mock lookup container expectations
+            when(meetingRepository.findCalendarMeetings(organizer)).thenReturn(Collections.emptyList());
+
+            // Execute a unit of work
+            List<Meeting> results = meetingService.calendarFor(organizer);
+
+            // Assert 1: Ensure direct flow and non-null pass-through returns
+            assertNotNull(results);
+            verify(meetingRepository, times(1)).findCalendarMeetings(organizer);
+        }
+
+        /**
+         * Test Case pendingInvitesFor -> Lookup Verification Path
+         */
+        @Test
+        @DisplayName("Should delegate status based invite checks straight to repository components")
+        void pendingInvitesFor_DelegatesToRepository() {
+            // Setup mock lookup container expectations
+            when(participantRepository.findByUserAndStatus(organizer, InviteStatus.PENDING))
+                    .thenReturn(Collections.emptyList());
+
+            // Execute a unit of work
+            List<MeetingParticipant> results = meetingService.pendingInvitesFor(organizer);
+
+            // Assert 1: Ensure direct flow and non-null pass-through returns
+            assertNotNull(results);
+            verify(participantRepository, times(1)).findByUserAndStatus(organizer, InviteStatus.PENDING);
         }
     }
 }

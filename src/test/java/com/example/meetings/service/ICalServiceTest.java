@@ -137,4 +137,142 @@ class ICalServiceTest {
         assertTrue(result.contains("STATUS:CONFIRMED\r\n"));
         assertTrue(result.contains("END:VEVENT\r\n"));
     }
+
+    /**
+     * Test Case render -> Participant Status and Confirmation Branch Coverage
+     * Objectives: Verify alternative participant invitation responses and meeting
+     * configurations mapping safely inside the calendar stream buffer.
+     * Specific Verifications:
+     * - Ensures InviteStatus.ACCEPTED cleanly transforms into PARTSTAT=ACCEPTED
+     * - Ensures InviteStatus.DECLINED cleanly transforms into PARTSTAT=DECLINED
+     * - Ensures an unconfirmed meeting correctly evaluates to STATUS:TENTATIVE
+     */
+    @Test
+    @DisplayName("render - Should correctly map ACCEPTED/DECLINED statuses and TENTATIVE meeting status")
+    void render_WithDifferentStatusesAndUnconfirmedMeeting() {
+
+        // Setup an unconfirmed meeting to evaluate the false statement branch
+        Meeting meeting = mock(Meeting.class);
+        when(meeting.getId()).thenReturn(101L);
+        when(meeting.getTitle()).thenReturn("Branch Coverage Meeting");
+        when(meeting.getStartTime()).thenReturn(Instant.parse("2026-06-10T10:00:00Z"));
+        when(meeting.getEndTime()).thenReturn(Instant.parse("2026-06-10T11:00:00Z"));
+        when(meeting.isConfirmed()).thenReturn(false);
+
+        // Setup base organizer mock details
+        User organizer = mock(User.class);
+        when(organizer.getUsername()).thenReturn("organizer");
+        when(organizer.getEmail()).thenReturn("org@test.com");
+        when(meeting.getOrganizer()).thenReturn(organizer);
+
+        // Setup Participant 1 to force the isolated switch expression ACCEPTED path
+        User user1 = mock(User.class);
+        when(user1.getUsername()).thenReturn("accepted_user");
+        when(user1.getEmail()).thenReturn("accepted@test.com");
+        MeetingParticipant p1 = mock(MeetingParticipant.class);
+        when(p1.getUser()).thenReturn(user1);
+        when(p1.getStatus()).thenReturn(InviteStatus.ACCEPTED);
+
+        // Setup Participant 2 to force the isolated switch expression DECLINED path
+        User user2 = mock(User.class);
+        when(user2.getUsername()).thenReturn("declined_user");
+        when(user2.getEmail()).thenReturn("declined@test.com");
+        MeetingParticipant p2 = mock(MeetingParticipant.class);
+        when(p2.getUser()).thenReturn(user2);
+        when(p2.getStatus()).thenReturn(InviteStatus.DECLINED);
+
+        // Bind multi-branch participant configurations into the parent stream context
+        when(meeting.getParticipants()).thenReturn(Set.of(p1, p2));
+
+        // Execute unit of work
+        String result = iCalService.render(owner, List.of(meeting));
+
+        // Assert 1: Confirm that the unconfirmed condition produces correct RFC string
+        // status
+        assertTrue(result.contains("STATUS:TENTATIVE\r\n"));
+        // Assert 2: Verify both distinct switch evaluation properties map perfectly
+        assertTrue(result.contains("ATTENDEE;CN=accepted_user;PARTSTAT=ACCEPTED:mailto:accepted@test.com\r\n"));
+        assertTrue(result.contains("ATTENDEE;CN=declined_user;PARTSTAT=DECLINED:mailto:declined@test.com\r\n"));
+    }
+
+    /**
+     * Test Case render -> Description Property Conditional Guards
+     * Objectives: Verify that optional descriptions completely suppress rendering
+     * structural components when processing null variants or whitespace inputs.
+     * Specific Verifications:
+     * - Ensures a null string reference does not invoke property output
+     * - Ensures a blank space string configuration skips internal logic evaluation
+     */
+    @Test
+    @DisplayName("render - Should completely omit DESCRIPTION when it is null or blank")
+    void render_WithNullOrBlankDescription() {
+
+        // Setup meeting one targeting the strict null verification conditional branch
+        Meeting m1 = mock(Meeting.class);
+        when(m1.getId()).thenReturn(1L);
+        when(m1.getTitle()).thenReturn("Null Desc");
+        when(m1.getStartTime()).thenReturn(Instant.parse("2026-06-10T10:00:00Z"));
+        when(m1.getEndTime()).thenReturn(Instant.parse("2026-06-10T11:00:00Z"));
+        when(m1.getOrganizer()).thenReturn(mock(User.class));
+        when(m1.getParticipants()).thenReturn(Collections.emptySet());
+        when(m1.getDescription()).thenReturn(null);
+
+        // Setup meeting two targeting the blank validation character constraint branch
+        Meeting m2 = mock(Meeting.class);
+        when(m2.getId()).thenReturn(2L);
+        when(m2.getTitle()).thenReturn("Blank Desc");
+        when(m2.getStartTime()).thenReturn(Instant.parse("2026-06-10T12:00:00Z"));
+        when(m2.getEndTime()).thenReturn(Instant.parse("2026-06-10T13:00:00Z"));
+        when(m2.getOrganizer()).thenReturn(mock(User.class));
+        when(m2.getParticipants()).thenReturn(Collections.emptySet());
+        when(m2.getDescription()).thenReturn("   ");
+
+        // Execute unit of work
+        String result = iCalService.render(owner, List.of(m1, m2));
+
+        // Assert 1: The document must completely isolate text lines from DESCRIPTION
+        // tokens
+        assertFalse(result.contains("DESCRIPTION:"));
+    }
+
+    /**
+     * Test Case render -> Escape Engine Null Safeguards and Control Formatting
+     * Objectives: Verify the character escaping logic under boundary conditions
+     * such as missing input properties or raw carriage line control data.
+     * Specific Verifications:
+     * - Ensures a null property object yields safe execution via fallback text
+     * expressions
+     * - Ensures text strings purge standard carriage control returns (\r) per
+     * specification rules
+     */
+    @Test
+    @DisplayName("render - Should handle null strings inside escape block and strip carriage returns")
+    void render_WithNullValuesAndCarriageReturn() {
+
+        // Setup a meeting structure delivering an explicit null title and explicit
+        // carriage text lines
+        Meeting meeting = mock(Meeting.class);
+        when(meeting.getId()).thenReturn(99L);
+        when(meeting.getTitle()).thenReturn(null);
+        when(meeting.getDescription()).thenReturn("Text\rWith\rCR");
+        when(meeting.getStartTime()).thenReturn(Instant.parse("2026-06-10T10:00:00Z"));
+        when(meeting.getEndTime()).thenReturn(Instant.parse("2026-06-10T11:00:00Z"));
+
+        // Setup simple contextual defaults
+        User organizer = mock(User.class);
+        when(organizer.getUsername()).thenReturn("org");
+        when(organizer.getEmail()).thenReturn("org@test.com");
+        when(meeting.getOrganizer()).thenReturn(organizer);
+        when(meeting.getParticipants()).thenReturn(Collections.emptySet());
+
+        // Execute unit of work
+        String result = iCalService.render(owner, List.of(meeting));
+
+        // Assert 1: Null values must pass safety guards and resolve into standard blank
+        // structures
+        assertTrue(result.contains("SUMMARY:\r\n"));
+        // Assert 2: Carriage control tokens must match formatting expressions and exit
+        // clean
+        assertTrue(result.contains("DESCRIPTION:TextWithCR\r\n"));
+    }
 }
