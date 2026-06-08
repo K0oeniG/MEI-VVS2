@@ -1,0 +1,39 @@
+name: Continuous Integration Pipeline
+
+# Triggers the execution pipeline on code changes to any branch or active Pull Request
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-and-test:
+    name: Build Application & Execute Test Suites
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Extract the source code hierarchy from the target git branch
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Establish the runtime execution context. 
+      # Using Temurin JDK 17 (or adapt to 21 depending on your pom.xml compilation target)
+      - name: Set up Java JDK Runtime
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven' # Automatically caches local ~/.m2 dependencies to accelerate subsequent builds
+
+      # Step 3: Explicitly verify browser engine binary structures.
+      # The github ubuntu-latest virtual environment comes with Google Chrome pre-installed.
+      - name: Verify Headless Browser Environment
+        run: |
+          google-chrome --version
+          mvn -version
+
+      # Step 4: Run compilation, verify constraints, and execute the complete test suite.
+      # This naturally triggers your structural Unit, Integration, and E2E Selenium tests.
+      - name: Execute Full-Stack Test Plan
+        run: mvn clean test -Ptest
