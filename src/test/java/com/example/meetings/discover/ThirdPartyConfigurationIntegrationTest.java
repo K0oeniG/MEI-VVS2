@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * This class validates the conditional environment initialization parameters
  * for our providers.
  * Reasoning -> By explicitly injecting blank credentials via
- * {@link TestPropertySource}, we test the real conditional boundary conditions
+ * {@link TestPropertySource}, I test the real conditional boundary conditions
  * of {@link TicketmasterProvider} and {@link SeatGeekProvider} to confirm that
  * the system safely disables their search execution loops if properties are
  * missing in a production environment.

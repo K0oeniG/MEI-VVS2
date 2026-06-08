@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * orchestration rules across all concrete third-party providers using
  * {@link SpringBootTest}.
  * 
- * Reasoning -> We load the full context to ensure that Spring's dependency
+ * Reasoning -> I load the full context to ensure that Spring's dependency
  * injection container automatically registers all active component beans
  * (AgendaLx, SeatGeek, Ticketmaster) into the {@link DiscoveryService} provider
  * list constructor. This verifies that our multi-provider fan-out architecture
