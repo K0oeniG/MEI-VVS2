@@ -29,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * End-to-End (E2E) UI Automation Test Suite
  * This class orchestrates full-stack boundary evaluations using a live embedded
- * server container,
- * an isolated test database registry, and automated Selenium browser
- * interactions.
- * * @author Diogo Carolino 58169
+ * server container, an isolated test database registry, and automated Selenium
+ * browser interactions.
+ * 
+ * @author Diogo Carolino 58169
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
@@ -63,18 +63,20 @@ class MeetingsAppE2ETest {
     void setupDriverAndDatabase() {
         this.baseAppUrl = "http://localhost:" + port;
 
-        // Purge transient relational states to enforce data isolation between clean
-        // runs
+        // Purge transient relational states to enforce strict test case isolation
         participantRepository.deleteAll();
         meetingRepository.deleteAll();
         userRepository.deleteAll();
 
-        // Configure headless Chrome execution for portability in automated environments
+        // Configure headless Chrome flags optimized for headless CI/CD execution
+        // servers
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless=new");
+        options.addArguments("--headless=new"); // Uses the updated Chrome headless implementation
         options.addArguments("--disable-gpu");
-        options.addArguments("--no-sandbox");
+        options.addArguments("--no-sandbox"); // Required for running as root in secure Docker runspaces
+        // Allocates resource memory pools to disk paths instead of /dev/shm
         options.addArguments("--disable-dev-shm-usage");
+        // Stabilizes element positioning and responsive viewport layouts
         options.addArguments("--window-size=1920,1080");
 
         this.driver = new ChromeDriver(options);
@@ -105,11 +107,13 @@ class MeetingsAppE2ETest {
         passwordInput.sendKeys("securePass123");
         submitButton.click();
 
+        // Core Assertion: Verify database persistence occurred correctly
         User structuralRecord = userRepository.findByUsername("selenium_diogo").orElse(null);
         assertNotNull(structuralRecord,
                 "The registration workflow must commit a valid entity row to the concrete database");
         assertEquals("diogo_e2e@example.com", structuralRecord.getEmail());
 
+        // Process actual web-tier authorization validation
         driver.get(baseAppUrl + "/login");
         driver.findElement(By.name("username")).sendKeys("selenium_diogo");
         driver.findElement(By.name("password")).sendKeys("securePass123");
@@ -156,10 +160,6 @@ class MeetingsAppE2ETest {
 
         driver.findElement(By.name("invitees")).sendKeys("alice_invitee");
 
-        // FIX: Target the submit button strictly within the scope of this specific form
-        // container.
-        // This prevents matching the "Logout" button inside the authenticated navbar
-        // header.
         WebElement proposalForm = driver.findElement(By.name("title")).findElement(By.xpath("./ancestor::form"));
         proposalForm.findElement(By.cssSelector("button[type='submit']")).click();
 
